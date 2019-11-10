@@ -497,6 +497,12 @@ structure TFC = struct
             String.concat (loop stream before TextIO.closeIn stream)
         end
 
+    val prelude = "define {i1} @NOT(i1 %arg) {\n\
+  \%r = xor i1 %arg, true\n\
+  \%r1 = insertvalue { i1 } undef, i1 %r, 0\n\
+  \ret { i1 } %r1\n\
+\}"
+
     fun compileFile path =
         let val code = readFileToString path
         in
@@ -504,7 +510,7 @@ structure TFC = struct
             in
                 let val llvm = compileDefs program defaultTypeEnv defaultWordEnv
                 in
-                    print llvm
+                    print (prelude ^ "\n\n" ^ llvm)
                 end
             end
         end
