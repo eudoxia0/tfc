@@ -12,7 +12,6 @@ structure TFC = struct
 
     datatype word = BoolWord of bool
                   | IntWord of string
-                  | StringWord of escaped_string
                   | NamedWord of name
 
     datatype type_spec = NamedTypeSpec of name
@@ -175,7 +174,7 @@ structure TFC = struct
     The grammar of types:
 
       tau = bool
-          | (u|i)(8|16|32|64)
+          | int
           | *tau
           | ( tau* -- tau* )
           | named type
@@ -220,33 +219,21 @@ structure TFC = struct
      *)
 
     datatype ty = Bool
-                | Int of signedness * bit_width
-                | StaticArray of ty
+                | Int
                 | WordType of ty list * ty list
-         and signedness = Unsigned | Signed
-         and bit_width = Bits8 | Bits16 | Bits32 | Bits64
 
     datatype word_type = WordTypeSig of ty list * ty list
-
-    val int32 = Int (Signed, Bits32)
 
     (* Rendering types *)
 
     fun typeToString Bool = "bool"
-      | typeToString (Int (s, w)) = (signednessString s) ^ (bitWidthString w)
-      | typeToString (StaticArray ty) = "[" ^ (typeToString ty) ^ "]"
+      | typeToString Int = "int"
       | typeToString (WordType (ps, rs)) =
         "( "
         ^ (String.concatWith " " (map typeToString ps))
         ^ " -- "
         ^ (String.concatWith " " (map typeToString rs))
         ^ " )"
-    and signednessString Unsigned = "u"
-      | signednessString Signed = "i"
-    and bitWidthString Bits8 = "8"
-      | bitWidthString Bits16 = "16"
-      | bitWidthString Bits32 = "32"
-      | bitWidthString Bits64 = "64"
 
     fun stackStateToString tys =
        "[" ^ (String.concatWith " " (map typeToString tys)) ^ "]"
@@ -266,14 +253,7 @@ structure TFC = struct
 
     val defaultTypeEnv = TEnv [
         ("bool", Bool),
-        ("u8", Int (Unsigned, Bits8)),
-        ("i8", Int (Signed, Bits8)),
-        ("u16", Int (Unsigned, Bits16)),
-        ("i16", Int (Signed, Bits16)),
-        ("u32", Int (Unsigned, Bits32)),
-        ("i32", int32),
-        ("u64", Int (Unsigned, Bits64)),
-        ("i64", Int (Signed, Bits64))
+        ("int", Int)
     ]
 
     (* Word environment *)
@@ -293,9 +273,8 @@ structure TFC = struct
         WEnv ((name, ty) :: wenv)
 
     val defaultWordEnv = WEnv [
-            ("nNOT", WordTypeSig ([Bool], [Bool])),
-            ("I32ADD", WordTypeSig ([int32, int32], [int32])),
-            ("I32DUALID", WordTypeSig ([int32, int32], [int32, int32]))
+            ("NOT", WordTypeSig ([Bool], [Bool])),
+            ("+", WordTypeSig ([Int, Int], [Int]))
         ]
 
     (* Type specifiers to types *)
@@ -311,8 +290,7 @@ structure TFC = struct
     (* Type of words *)
 
     fun wordType _ (BoolWord _) = litType Bool
-      | wordType _ (IntWord _) = litType int32
-      | wordType _ (StringWord _) = litType (StaticArray (Int (Unsigned, Bits8)))
+      | wordType _ (IntWord _) = litType Int
       | wordType wenv (NamedWord name) =
         case findWordType wenv name of
             (SOME ty) => ty
@@ -366,16 +344,10 @@ structure TFC = struct
 
     fun compileType Bool =
         "i1"
-      | compileType (Int (_, w)) =
-        "i" ^ (widthToString w)
-      | compileType (StaticArray t) =
-        (compileType t) ^ "*"
+      | compileType (Int ) =
+        "i32"
       | compileType (WordType (args, res)) =
         "{" ^ (commaSep (map compileType res)) ^ "} (" ^ (commaSep (map compileType args))
-    and widthToString Bits8 = "8"
-      | widthToString Bits16 = "16"
-      | widthToString Bits32 = "32"
-      | widthToString Bits64 = "64"
 
     val registerCount = ref 0
 
@@ -397,9 +369,7 @@ structure TFC = struct
     fun augment _ (BoolWord b) =
         TBoolWord (b, Bool)
       | augment _ (IntWord i) =
-        TIntWord (i, int32)
-      | augment _ (StringWord es) =
-        TStringWord (es, StaticArray (Int (Unsigned, Bits8)))
+        TIntWord (i, Int)
       | augment wenv (NamedWord name) =
         TNamedWord (name, wordType wenv (NamedWord name))
 
