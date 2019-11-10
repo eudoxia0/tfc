@@ -12,7 +12,6 @@ structure TFC = struct
 
     datatype word = BoolWord of bool
                   | IntWord of string
-                  | FloatWord of string
                   | StringWord of escaped_string
                   | NamedWord of name
 
@@ -97,25 +96,6 @@ structure TFC = struct
 
         val integerParser = ps.pmap IntWord integerTextParser
 
-        (* Float Constants *)
-
-        val eParser = ps.or (ps.pchar #"e") (ps.pchar #"E")
-
-        val exponentParser = ps.seqR eParser integerTextParser
-
-        fun toFloat (intPart, (decPart, exponent)) =
-            let val expStr = case exponent of
-                                 SOME e => "e" ^ e
-                               | NONE => ""
-            in
-                intPart ^ "." ^ decPart ^ expStr
-            end
-
-        val floatParser = ps.pmap (FloatWord o toFloat)
-                                  (ps.seq integerTextParser (ps.seqR (ps.pchar #".")
-                                                                     (ps.seq integerTextParser
-                                                                             (ps.opt exponentParser))))
-
         (* Strings *)
 
         val stringChar = ps.or (ps.seqR (ps.pchar #"\\") (ps.pchar #"\"")) (ps.noneOf [#"\""])
@@ -165,7 +145,6 @@ structure TFC = struct
 
         val wordParser =
             ps.choice [integerParser,
-                       floatParser,
                        stringParser,
                        ps.pmap NamedWord symbolParser]
 
@@ -243,12 +222,10 @@ structure TFC = struct
 
     datatype ty = Bool
                 | Int of signedness * bit_width
-                | Float of float_width
                 | StaticArray of ty
                 | WordType of ty list * ty list
          and signedness = Unsigned | Signed
          and bit_width = Bits8 | Bits16 | Bits32 | Bits64
-         and float_width = Float32 | Float64
 
     datatype word_type = WordTypeSig of ty list * ty list
 
@@ -258,8 +235,6 @@ structure TFC = struct
 
     fun typeToString Bool = "bool"
       | typeToString (Int (s, w)) = (signednessString s) ^ (bitWidthString w)
-      | typeToString (Float Float32) = "f32"
-      | typeToString (Float Float64) = "f64"
       | typeToString (StaticArray ty) = "[" ^ (typeToString ty) ^ "]"
       | typeToString (WordType (ps, rs)) =
         "( "
@@ -299,9 +274,7 @@ structure TFC = struct
         ("u32", Int (Unsigned, Bits32)),
         ("i32", int32),
         ("u64", Int (Unsigned, Bits64)),
-        ("i64", Int (Signed, Bits64)),
-        ("f32", Float Float32),
-        ("f64", Float Float64)
+        ("i64", Int (Signed, Bits64))
     ]
 
     (* Word environment *)
@@ -340,7 +313,6 @@ structure TFC = struct
 
     fun wordType _ (BoolWord _) = litType Bool
       | wordType _ (IntWord _) = litType int32
-      | wordType _ (FloatWord _) = litType (Float Float64)
       | wordType _ (StringWord _) = litType (StaticArray (Int (Unsigned, Bits8)))
       | wordType wenv (NamedWord name) =
         case findWordType wenv name of
@@ -397,10 +369,6 @@ structure TFC = struct
         "i1"
       | compileType (Int (_, w)) =
         "i" ^ (widthToString w)
-      | compileType (Float Float32) =
-        "f32"
-      | compileType (Float Float64) =
-        "f64"
       | compileType (StaticArray t) =
         (compileType t) ^ "*"
       | compileType (WordType (args, res)) =
@@ -424,7 +392,6 @@ structure TFC = struct
 
     datatype tast = TBoolWord of bool * ty
                   | TIntWord of string * ty
-                  | TFloatWord of string * ty
                   | TStringWord of escaped_string * ty
                   | TNamedWord of name * word_type
 
@@ -432,8 +399,6 @@ structure TFC = struct
         TBoolWord (b, Bool)
       | augment _ (IntWord i) =
         TIntWord (i, int32)
-      | augment _ (FloatWord f) =
-        TFloatWord (f, Float Float64)
       | augment _ (StringWord es) =
         TStringWord (es, StaticArray (Int (Unsigned, Bits8)))
       | augment wenv (NamedWord name) =
@@ -496,8 +461,6 @@ structure TFC = struct
                         (if b then "true" else "false")
       | compileWord (TIntWord (i, ty)) =
         compileConstant ty i
-      | compileWord (TFloatWord (f, ty)) =
-        compileConstant ty f
       | compileWord (TStringWord (s, _)) =
         compileString s
       | compileWord (TNamedWord (name, ty)) =
