@@ -1,0 +1,6 @@
+Library
+  structure TFC
+is
+  $/basis.cm
+  vendor/parsimony/parsimony.cm
+  tfc.sml
