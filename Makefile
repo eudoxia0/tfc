@@ -5,6 +5,7 @@ MLTON := mlton
 BIN := tfc
 
 CM_FILE := tfc.cm
+MLB_FILE := tfc.mlb
 
 VENDOR_DIR := vendor
 PARSIMONY := $(VENDOR_DIR)/parsimony
@@ -22,3 +23,6 @@ $(PARSIMONY): $(VENDOR_DIR)
 
 compile: $(SRC) $(PARSIMONY)
 	$(SML) $(SMLFLAGS) -m $(CM_FILE)
+
+tfc: $(SRC) $(PARSIMONY)
+	$(MLTON) $(MLB_FILE)
