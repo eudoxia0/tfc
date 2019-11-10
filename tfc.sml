@@ -121,6 +121,11 @@ structure TFC = struct
             case (ps.run definitionParser (ParsimonyStringInput.fromString s)) of
                 (ps.Success r) => r
               | f => raise Fail ("Bad parse: " ^ (ps.explain f))
+
+        fun parseProgram s =
+            case (ps.run programParser (ParsimonyStringInput.fromString s)) of
+                (ps.Success r) => r
+              | f => raise Fail ("Bad parse: " ^ (ps.explain f))
     end
 
     (* Type checking
@@ -481,4 +486,33 @@ structure TFC = struct
         in
             repl' defaultTypeEnv defaultWordEnv
         end
+
+    fun readFileToString filepath =
+        let val stream = TextIO.openIn filepath
+            fun loop stream =
+                case TextIO.inputLine stream of
+                    SOME line => line :: loop stream
+                  | NONE      => []
+        in
+            String.concat (loop stream before TextIO.closeIn stream)
+        end
+
+    fun compileFile path =
+        let val code = readFileToString path
+        in
+            let val (program, _) = Parser.parseProgram code
+            in
+                let val llvm = compileDefs program defaultTypeEnv defaultWordEnv
+                in
+                    print llvm
+                end
+            end
+        end
+    and compileDefs (def::rest) tenv wenv =
+        let val (wenv', llvm) = compile tenv wenv def
+        in
+            llvm ^ "\n\n" ^ (compileDefs rest tenv wenv')
+        end
+      | compileDefs nil _ _ =
+        ""
 end
