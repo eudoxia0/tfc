@@ -115,7 +115,7 @@ structure TFC = struct
 
         val programParser =
             ps.seqR ws
-                    (ps.many (ps.seqR ws1 definitionParser))
+                    (ps.many1 (ps.seqL definitionParser ws))
 
         fun parseString s =
             case (ps.run definitionParser (ParsimonyStringInput.fromString s)) of
