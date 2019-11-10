@@ -176,7 +176,6 @@ structure TFC = struct
 
       tau = bool
           | (u|i)(8|16|32|64)
-          | f(32|64)
           | *tau
           | ( tau* -- tau* )
           | named type
