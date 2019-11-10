@@ -21,42 +21,6 @@ structure TFC = struct
 
     type program = definition list
 
-    (* String literals *)
-
-    fun escapeString s =
-        EscapedString (String.implode (escapeList (String.explode s)))
-    and escapeList (#"\\" :: #"n" :: rest) = #"\n" :: (escapeList rest)
-      | escapeList (#"\\" :: #"r" :: rest) = #"\r" :: (escapeList rest)
-      | escapeList (#"\\" :: #"t" :: rest) = #"\t" :: (escapeList rest)
-      | escapeList (#"\\" :: #"\"" :: rest) = #"\"" :: (escapeList rest)
-      | escapeList (#"\\" :: #"\\" :: rest) = #"\\" :: (escapeList rest)
-      | escapeList (#"\\" :: #" " :: rest) = consumeWhitespace (#" " :: rest)
-      | escapeList (#"\\" :: #"\n" :: rest) = consumeWhitespace (#" " :: rest)
-      | escapeList (#"\\" :: #"\r" :: rest) = consumeWhitespace (#" " :: rest)
-      | escapeList (#"\\" :: #"\t" :: rest) = consumeWhitespace (#" " :: rest)
-      | escapeList (#"\\" :: #"\v" :: rest) = consumeWhitespace (#" " :: rest)
-      | escapeList (#"\\" :: #"\f" :: rest) = consumeWhitespace (#" " :: rest)
-      | escapeList (head :: rest) = head :: (escapeList rest)
-      | escapeList nil = nil
-    and consumeWhitespace (#" "  :: rest) = consumeWhitespace rest
-      | consumeWhitespace (#"\n" :: rest) = consumeWhitespace rest
-      | consumeWhitespace (#"\r" :: rest) = consumeWhitespace rest
-      | consumeWhitespace (#"\t" :: rest) = consumeWhitespace rest
-      | consumeWhitespace (#"\v" :: rest) = consumeWhitespace rest
-      | consumeWhitespace (#"\f" :: rest) = consumeWhitespace rest
-      | consumeWhitespace (#"\\" :: rest) = rest
-      | consumeWhitespace _ = raise Fail "Bad whitespace escape sequence"
-
-    fun unescapeString (EscapedString s) =
-        String.concat (map unescapeChar (String.explode s))
-
-    and unescapeChar #"\n" = "\\n"
-      | unescapeChar #"\r" = "\\r"
-      | unescapeChar #"\t" = "\\t"
-      | unescapeChar #"\"" = "\\\""
-      | unescapeChar #"\\" = "\\\\"
-      | unescapeChar c = String.str c
-
     (* Parsing *)
 
     structure Parser = struct
@@ -94,15 +58,6 @@ structure TFC = struct
         val integerTextParser = ps.pmap applySign (ps.seq signParser naturalParser)
 
         val integerParser = ps.pmap IntWord integerTextParser
-
-        (* Strings *)
-
-        val stringChar = ps.or (ps.seqR (ps.pchar #"\\") (ps.pchar #"\"")) (ps.noneOf [#"\""])
-
-        val stringParser = ps.pmap (StringWord o escapeString o String.implode)
-                                   (ps.between (ps.pchar #"\"")
-                                               (ps.many stringChar)
-                                               (ps.pchar #"\""))
 
         (* Symbols *)
 
@@ -144,7 +99,6 @@ structure TFC = struct
 
         val wordParser =
             ps.choice [integerParser,
-                       stringParser,
                        ps.pmap NamedWord symbolParser]
 
         val definitionParser =
@@ -363,7 +317,6 @@ structure TFC = struct
 
     datatype tast = TBoolWord of bool * ty
                   | TIntWord of string * ty
-                  | TStringWord of escaped_string * ty
                   | TNamedWord of name * word_type
 
     fun augment _ (BoolWord b) =
@@ -430,8 +383,6 @@ structure TFC = struct
                         (if b then "true" else "false")
       | compileWord (TIntWord (i, ty)) =
         compileConstant ty i
-      | compileWord (TStringWord (s, _)) =
-        compileString s
       | compileWord (TNamedWord (name, ty)) =
         compileNamedWord name ty
 
@@ -441,9 +392,6 @@ structure TFC = struct
         in
             (renderRegister reg) ^ " = select i1 true, " ^ ty' ^ " " ^ value ^ ", " ^ ty' ^ " " ^ value
         end
-
-    and compileString str =
-        raise Fail "Nope"
 
     and compileNamedWord name ty =
         let val (WordTypeSig (args, res)) = ty
